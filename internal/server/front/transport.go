@@ -9,19 +9,19 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (sf *Front) uploadFileHandler(resp http.ResponseWriter, req *http.Request) {
+func (sf *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) {
 	fileID := chi.URLParam(req, "fileID")
 	fileSize := req.URL.Query().Get("fileSize")
 	_, _ = resp.Write([]byte("fileID: " + fileID + ", fileSize: " + fileSize))
 }
 
-func (sf *Front) getFileHandler(resp http.ResponseWriter, req *http.Request) {
+func (sf *Server) getFileHandler(resp http.ResponseWriter, req *http.Request) {
 	fileID := chi.URLParam(req, "fileID")
 	fileSize := req.URL.Query().Get("fileSize")
 	_, _ = resp.Write([]byte("fileID: " + fileID + ", fileSize: " + fileSize))
 }
 
-func (sf *Front) error(_ *http.Request, w http.ResponseWriter, err error) {
+func (sf *Server) error(_ *http.Request, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, context.Canceled):
 		writeErrResponse(w, "timeout", http.StatusRequestTimeout)

@@ -18,12 +18,12 @@ type Config struct {
 	WriteTimeout time.Duration
 }
 
-type Front struct {
+type Server struct {
 	srv *http.Server
 }
 
-func New(cfg Config) (*Front, error) {
-	frontServer := &Front{}
+func New(cfg Config) (*Server, error) {
+	frontServer := &Server{}
 
 	handler := frontServer.initServerHandler()
 	frontServer.srv = &http.Server{
@@ -36,7 +36,7 @@ func New(cfg Config) (*Front, error) {
 	return frontServer, nil
 }
 
-func (sf *Front) initServerHandler() *chi.Mux {
+func (sf *Server) initServerHandler() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(
 		middleware.Recoverer,
@@ -73,7 +73,7 @@ func (sf *Front) initServerHandler() *chi.Mux {
 	return r
 }
 
-func (sf *Front) Run(ctx context.Context) error {
+func (sf *Server) Run(ctx context.Context) error {
 	closedCh := make(chan struct{})
 
 	go func() {
@@ -83,6 +83,7 @@ func (sf *Front) Run(ctx context.Context) error {
 		withTimeout, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
+		//nolint:contextcheck // intentionally used another context as main one is most probably already canceled
 		if err := sf.srv.Shutdown(withTimeout); err != nil {
 			slog.Warn("err stopping http server", "err", err)
 		}

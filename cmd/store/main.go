@@ -8,38 +8,33 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/itimofeev/yas3/internal/server/front"
+	"github.com/itimofeev/yas3/internal/server/store"
 )
 
 type configuration struct {
-	FrontAddr         string        `envconfig:"FRONT_ADDR" default:":8080"`
-	FrontReadTimeout  time.Duration `envconfig:"FRONT_READ_DURATION" default:"10s"`
-	FrontWriteTimeout time.Duration `envconfig:"FRONT_WRITE_DURATION" default:"10s"`
+	StoreServerPort int `envconfig:"STORE_SERVER_PORT" default:"9090"`
 }
 
 func main() {
 	cfg := mustParseConfig()
 
-	slog.Info("front-server is starting")
+	slog.Info("store-server is starting")
 	if err := run(cfg); err != nil && !errors.Is(err, context.Canceled) {
-		slog.Error("service is stopped with error", "err", err)
+		slog.Error("store-server is stopped with error", "err", err)
 	}
 
-	slog.Info("service is stopped")
+	slog.Info("store-server is stopped")
 }
 
 func run(cfg configuration) error {
 	ctx := signalContext()
 
-	frontServer, err := front.New(front.Config{
-		Addr:         cfg.FrontAddr,
-		ReadTimeout:  cfg.FrontReadTimeout,
-		WriteTimeout: cfg.FrontWriteTimeout,
+	storeServer, err := store.New(store.Config{
+		Port: cfg.StoreServerPort,
 	})
 	if err != nil {
 		return err
@@ -48,7 +43,7 @@ func run(cfg configuration) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		return frontServer.Run(ctx)
+		return storeServer.Run(ctx)
 	})
 
 	return eg.Wait()
