@@ -13,15 +13,16 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/itimofeev/yas3/internal/provider/store"
+	"github.com/itimofeev/yas3/internal/provider/registry"
 	"github.com/itimofeev/yas3/internal/server/front"
 )
 
+// FRONT_STORE_CLIENT_ADDR=https://localhost:9090,https://localhost:9091
 type configuration struct {
 	FrontAddr         string        `envconfig:"FRONT_ADDR" default:":8080"`
 	FrontReadTimeout  time.Duration `envconfig:"FRONT_READ_DURATION" default:"10s"`
 	FrontWriteTimeout time.Duration `envconfig:"FRONT_WRITE_DURATION" default:"10s"`
-	StoreAddr         string        `envconfig:"FRONT_STORE_CLIENT_ADDR" default:"https://localhost:9090"`
+	StoreServerAddrs  []string      `envconfig:"FRONT_STORE_CLIENT_ADDR" default:"https://localhost:9090"`
 }
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 func run(cfg configuration) error {
 	ctx := signalContext()
 
-	storeClient, err := store.New(store.Config{StoreAddr: cfg.StoreAddr})
+	storeServersRegistry, err := registry.New(ctx, registry.Config{StoreServerAddrs: cfg.StoreServerAddrs})
 	if err != nil {
 		return err
 	}
@@ -49,7 +50,7 @@ func run(cfg configuration) error {
 		WriteTimeout:     cfg.FrontWriteTimeout,
 		MaxFileSizeBytes: 1024 * 1024,
 		PartsCount:       2,
-		StoreClient:      storeClient,
+		Registry:         storeServersRegistry,
 	})
 	if err != nil {
 		return err
@@ -59,6 +60,9 @@ func run(cfg configuration) error {
 
 	eg.Go(func() error {
 		return frontServer.Run(ctx)
+	})
+	eg.Go(func() error {
+		return storeServersRegistry.Run(ctx)
 	})
 
 	return eg.Wait()

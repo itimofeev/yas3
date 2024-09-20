@@ -15,10 +15,11 @@ import (
 	"github.com/itimofeev/yas3/internal/server/store"
 )
 
+// STORE_SERVER_ADDR=:9090;STORE_BASE_PATH=temp/store/1
 type configuration struct {
 	StoreServerAddr     string `envconfig:"STORE_SERVER_ADDR" default:":9090"`
 	StoreBasePath       string `envconfig:"STORE_BASE_PATH" default:"temp/store/1"`
-	StoreTotalSizeBytes int    `envconfig:"STORE_TOTAL_SIZE_BYTES" default:"1000000000"`
+	StoreTotalSizeBytes int    `envconfig:"STORE_TOTAL_SIZE_BYTES" default:"1073741824"` // 1Gb
 }
 
 func main() {

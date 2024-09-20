@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/go-playground/validator/v10"
 
@@ -30,6 +31,10 @@ func New(cfg Config) (*Server, error) {
 	err := validator.New().Struct(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("config validation error: %w", err)
+	}
+
+	if _, err := os.Stat(cfg.BasePath); errors.Is(err, os.ErrNotExist) {
+		return nil, err
 	}
 
 	cert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))

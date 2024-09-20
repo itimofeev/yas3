@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/quic-go/quic-go/http3"
@@ -42,6 +43,7 @@ func New(cfg Config) (*Client, error) {
 }
 
 func (c *Client) UploadFile(ctx context.Context, fileName string, content io.Reader) error {
+	slog.Debug("starting upload file to store server", "fileName", fileName, "serverId", c.GetID())
 	url := c.cfg.StoreAddr + "/api/v1/uploadFile/" + fileName
 	uploadReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, content)
 	if err != nil {
@@ -56,6 +58,7 @@ func (c *Client) UploadFile(ctx context.Context, fileName string, content io.Rea
 		return fmt.Errorf("response code not 200: %d", resp.StatusCode)
 	}
 
+	slog.Debug("file uploaded to store server", "fileName", fileName, "serverId", c.GetID())
 	return nil
 }
 
@@ -101,6 +104,10 @@ func (c *Client) GetAvailableSpace(ctx context.Context) (entity.AvailableSpace, 
 		Total: m["total"],
 		Used:  m["used"],
 	}, nil
+}
+
+func (c *Client) GetID() string {
+	return c.cfg.StoreAddr
 }
 
 func getRootCA() *x509.CertPool {

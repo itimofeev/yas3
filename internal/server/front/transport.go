@@ -37,10 +37,12 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 
 	partSize := fileSize/s.cfg.PartsCount + 1
 
-	for partNumber := range s.cfg.PartsCount {
-		fileName := fileID.String() + "." + strconv.FormatInt(partNumber, 10)
+	storeServers, err := s.registry.GetServersForParts(s.cfg.PartsCount)
+
+	for partNumber, storeForUpload := range storeServers {
+		fileName := fileID.String() + "." + strconv.FormatInt(int64(partNumber), 10)
 		partReader := io.LimitReader(req.Body, partSize)
-		err := s.storeClient.UploadFile(req.Context(), fileName, partReader)
+		err := storeForUpload.UploadFile(req.Context(), fileName, partReader)
 
 		if err != nil {
 			s.error(req, resp, err)
@@ -61,14 +63,16 @@ func (s *Server) getFileHandler(resp http.ResponseWriter, req *http.Request) {
 		fileName := fileID.String() + "." + strconv.FormatInt(partNumber, 10)
 
 		err := func(ctx context.Context) error {
-			filePartReader, err := s.storeClient.GetFile(ctx, fileName)
-			if err != nil {
-				return err
-			}
-			defer filePartReader.Close()
-
-			_, err = io.Copy(resp, filePartReader)
-			return err
+			_ = fileName
+			return nil
+			//filePartReader, err := s.storeClient.GetFile(ctx, fileName)
+			//if err != nil {
+			//	return err
+			//}
+			//defer filePartReader.Close()
+			//
+			//_, err = io.Copy(resp, filePartReader)
+			//return err
 		}(req.Context())
 
 		if err != nil {

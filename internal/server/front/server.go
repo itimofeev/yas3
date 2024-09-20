@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -14,25 +13,23 @@ import (
 	"github.com/itimofeev/yas3/internal/entity"
 )
 
-type storeClient interface {
-	UploadFile(ctx context.Context, fileName string, content io.Reader) error
-	GetFile(ctx context.Context, fileName string) (io.ReadCloser, error)
-	GetAvailableSpace(ctx context.Context) (entity.AvailableSpace, error)
+type storeServersRegistry interface {
+	GetServersForParts(nFileParts int64) ([]entity.StoreClient, error)
 }
 
 type Config struct {
-	Addr             string        `validate:"required"`
-	ReadTimeout      time.Duration `validate:"required"`
-	WriteTimeout     time.Duration `validate:"required"`
-	MaxFileSizeBytes int64         `validate:"required,gt=0"`
-	PartsCount       int64         `validate:"required,gt=0"`
-	StoreClient      storeClient   `validate:"required"`
+	Addr             string               `validate:"required"`
+	ReadTimeout      time.Duration        `validate:"required"`
+	WriteTimeout     time.Duration        `validate:"required"`
+	MaxFileSizeBytes int64                `validate:"required,gt=0"`
+	PartsCount       int64                `validate:"required,gt=0"`
+	Registry         storeServersRegistry `validate:"required"`
 }
 
 type Server struct {
-	srv         *http.Server
-	cfg         Config
-	storeClient storeClient
+	srv      *http.Server
+	cfg      Config
+	registry storeServersRegistry
 }
 
 func New(cfg Config) (*Server, error) {
@@ -42,8 +39,8 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	frontServer := &Server{
-		cfg:         cfg,
-		storeClient: cfg.StoreClient,
+		cfg:      cfg,
+		registry: cfg.Registry,
 	}
 
 	handler := frontServer.initServerHandler()
