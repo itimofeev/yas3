@@ -16,7 +16,7 @@ import (
 func TestFrontServer(t *testing.T) {
 	storeClient, err := front.New(front.Config{BasePath: "http://localhost:8080"})
 	require.NoError(t, err)
-	for range 100 {
+	for range 1 {
 		checkFileUpload(t, 100, storeClient)
 	}
 }

@@ -37,8 +37,13 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 
 	partSize := fileSize/s.cfg.PartsCount + 1
 
-	storeServers, err := s.registry.GetServersForParts(s.cfg.PartsCount)
+	storeServers, err := s.serversRegistry.GetServersForParts(s.cfg.PartsCount)
+	if err != nil {
+		s.error(req, resp, err)
+		return
+	}
 
+	serverIDs := make([]string, 0, len(storeServers))
 	for partNumber, storeForUpload := range storeServers {
 		fileName := fileID.String() + "." + strconv.FormatInt(int64(partNumber), 10)
 		partReader := io.LimitReader(req.Body, partSize)
@@ -48,6 +53,12 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 			s.error(req, resp, err)
 			return
 		}
+		serverIDs = append(serverIDs, storeForUpload.GetID())
+	}
+
+	if err := s.fileRegistry.SaveFileParts(fileID.String(), serverIDs); err != nil {
+		s.error(req, resp, err)
+		return
 	}
 }
 
@@ -59,20 +70,30 @@ func (s *Server) getFileHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	for partNumber := range s.cfg.PartsCount {
-		fileName := fileID.String() + "." + strconv.FormatInt(partNumber, 10)
+	serverIDs, err := s.fileRegistry.GetFileParts(fileID.String())
+	if err != nil {
+		s.error(req, resp, err)
+		return
+	}
+
+	storeClients, err := s.serversRegistry.GetStoreClients(serverIDs)
+	if err != nil {
+		s.error(req, resp, err)
+		return
+	}
+
+	for partNumber, storeClient := range storeClients {
+		fileName := fileID.String() + "." + strconv.FormatInt(int64(partNumber), 10)
 
 		err := func(ctx context.Context) error {
-			_ = fileName
-			return nil
-			//filePartReader, err := s.storeClient.GetFile(ctx, fileName)
-			//if err != nil {
-			//	return err
-			//}
-			//defer filePartReader.Close()
-			//
-			//_, err = io.Copy(resp, filePartReader)
-			//return err
+			filePartReader, err := storeClient.GetFile(ctx, fileName)
+			if err != nil {
+				return err
+			}
+			defer filePartReader.Close()
+
+			_, err = io.Copy(resp, filePartReader)
+			return err
 		}(req.Context())
 
 		if err != nil {

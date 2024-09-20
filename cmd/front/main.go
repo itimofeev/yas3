@@ -13,7 +13,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/itimofeev/yas3/internal/provider/registry"
+	fileregistry "github.com/itimofeev/yas3/internal/provider/file-registry"
+	serverRegistry "github.com/itimofeev/yas3/internal/provider/server-registry"
 	"github.com/itimofeev/yas3/internal/server/front"
 )
 
@@ -23,6 +24,7 @@ type configuration struct {
 	FrontReadTimeout  time.Duration `envconfig:"FRONT_READ_DURATION" default:"10s"`
 	FrontWriteTimeout time.Duration `envconfig:"FRONT_WRITE_DURATION" default:"10s"`
 	StoreServerAddrs  []string      `envconfig:"FRONT_STORE_CLIENT_ADDR" default:"https://localhost:9090"`
+	FilesDBPath       string        `envconfig:"FRONT_FILES_DB_PATH" default:"temp/store/badger"`
 }
 
 func main() {
@@ -39,10 +41,18 @@ func main() {
 func run(cfg configuration) error {
 	ctx := signalContext()
 
-	storeServersRegistry, err := registry.New(ctx, registry.Config{StoreServerAddrs: cfg.StoreServerAddrs})
+	storeServersRegistry, err := serverRegistry.New(ctx, serverRegistry.Config{StoreServerAddrs: cfg.StoreServerAddrs})
 	if err != nil {
 		return err
 	}
+
+	fileRegistry, err := fileregistry.New(fileregistry.Config{
+		DBPath: cfg.FilesDBPath,
+	})
+	if err != nil {
+		return err
+	}
+	defer fileRegistry.Close()
 
 	frontServer, err := front.New(front.Config{
 		Addr:             cfg.FrontAddr,
@@ -50,7 +60,8 @@ func run(cfg configuration) error {
 		WriteTimeout:     cfg.FrontWriteTimeout,
 		MaxFileSizeBytes: 1024 * 1024,
 		PartsCount:       2,
-		Registry:         storeServersRegistry,
+		ServersRegistry:  storeServersRegistry,
+		FileRegistry:     fileRegistry,
 	})
 	if err != nil {
 		return err

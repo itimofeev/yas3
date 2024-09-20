@@ -1,4 +1,4 @@
-package registry
+package server_registry
 
 import (
 	"context"
@@ -64,6 +64,21 @@ func (r *Registry) GetServersForParts(nFileParts int64) ([]entity.StoreClient, e
 		storeClients = append(storeClients, r.mostFreeClients[n%int64(len(r.mostFreeClients))])
 	}
 	return storeClients, nil
+}
+
+func (r *Registry) GetStoreClients(serverIDs []string) ([]entity.StoreClient, error) {
+	r.muState.RLock()
+	defer r.muState.RUnlock()
+
+	clients := make([]entity.StoreClient, 0, len(serverIDs))
+	for _, serverID := range serverIDs {
+		state := r.states[serverID]
+		if !state.IsOnline {
+			return nil, fmt.Errorf("storeClient for server %s is offline", serverID)
+		}
+		clients = append(clients, r.storeClients[serverID])
+	}
+	return clients, nil
 }
 
 func (r *Registry) Run(ctx context.Context) error {

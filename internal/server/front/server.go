@@ -15,6 +15,11 @@ import (
 
 type storeServersRegistry interface {
 	GetServersForParts(nFileParts int64) ([]entity.StoreClient, error)
+	GetStoreClients(serverIDs []string) ([]entity.StoreClient, error)
+}
+type fileRegistry interface {
+	SaveFileParts(fileID string, serverIDs []string) error
+	GetFileParts(fileID string) ([]string, error)
 }
 
 type Config struct {
@@ -23,13 +28,15 @@ type Config struct {
 	WriteTimeout     time.Duration        `validate:"required"`
 	MaxFileSizeBytes int64                `validate:"required,gt=0"`
 	PartsCount       int64                `validate:"required,gt=0"`
-	Registry         storeServersRegistry `validate:"required"`
+	ServersRegistry  storeServersRegistry `validate:"required"`
+	FileRegistry     fileRegistry         `validate:"required"`
 }
 
 type Server struct {
-	srv      *http.Server
-	cfg      Config
-	registry storeServersRegistry
+	srv             *http.Server
+	cfg             Config
+	serversRegistry storeServersRegistry
+	fileRegistry    fileRegistry
 }
 
 func New(cfg Config) (*Server, error) {
@@ -39,8 +46,9 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	frontServer := &Server{
-		cfg:      cfg,
-		registry: cfg.Registry,
+		cfg:             cfg,
+		serversRegistry: cfg.ServersRegistry,
+		fileRegistry:    cfg.FileRegistry,
 	}
 
 	handler := frontServer.initServerHandler()
