@@ -12,13 +12,13 @@ import (
 func (sf *Front) uploadFileHandler(resp http.ResponseWriter, req *http.Request) {
 	fileID := chi.URLParam(req, "fileID")
 	fileSize := req.URL.Query().Get("fileSize")
-	resp.Write([]byte("fileID: " + fileID + ", fileSize: " + fileSize))
+	_, _ = resp.Write([]byte("fileID: " + fileID + ", fileSize: " + fileSize))
 }
 
 func (sf *Front) getFileHandler(resp http.ResponseWriter, req *http.Request) {
 	fileID := chi.URLParam(req, "fileID")
 	fileSize := req.URL.Query().Get("fileSize")
-	resp.Write([]byte("fileID: " + fileID + ", fileSize: " + fileSize))
+	_, _ = resp.Write([]byte("fileID: " + fileID + ", fileSize: " + fileSize))
 }
 
 func (sf *Front) error(_ *http.Request, w http.ResponseWriter, err error) {

@@ -1,0 +1,145 @@
+run:
+  go: '1.22'
+  tests: true
+  build-tags:
+    - integration
+
+issues:
+  exclude-use-default: false
+  exclude-dirs:
+    - contrib
+  max-same-issues: 0
+
+  exclude:
+    - G107 # Potential HTTP request made with variable url
+    - G404 # Weak random number generator
+    - SA9003 # Empty branch
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gochecknoglobals
+        - errcheck
+        - gocognit
+        - maintidx
+        - forbidigo
+
+linters-settings:
+  cyclop:
+    max-complexity: 20
+
+  lll:
+    line-length: 180
+
+  nestif:
+    min-complexity: 7
+
+  tagliatelle:
+    case:
+      use-field-name: true
+      rules:
+        json: camel
+
+  nolintlint:
+    # Enable to require an explanation of nonzero length after each nolint directive.
+    # Default: false
+    require-explanation: true
+    # Enable to require nolint directives to mention the specific linter being suppressed.
+    # Default: false
+    require-specific: true
+
+  goimports:
+    # A comma-separated list of prefixes, which, if set, checks import paths
+    # with the given prefixes are grouped after 3rd-party packages.
+    local-prefixes: github.com/itimofeev/yas3
+
+  exhaustive:
+    check-generated: false
+    default-signifies-exhaustive: true
+
+  depguard:
+    rules:
+      # Name of a rule.
+      main:
+        # List of file globs that will match this list of settings to compare against.
+        # Default: $all
+        files:
+          - $all
+        # List of allowed packages.
+        allow:
+          - $gostd
+          - google.golang.org
+          - github.com
+        # Packages that are not allowed where the value is a suggestion.
+        deny:
+          - pkg: "github.com/pkg/errors"
+            desc: Should be replaced by standard lib errors package
+
+  testifylint:
+    enable-all: true
+
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - cyclop
+    - decorder
+    - depguard
+    - dogsled
+    - durationcheck
+    - grouper
+    - errname
+    - errcheck
+    - errorlint
+    - exportloopref
+    - exhaustive
+    - fatcontext
+    - forbidigo
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goheader
+    - goimports
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosimple
+    - govet
+    - importas
+    - ineffassign
+    - intrange
+    - maintidx
+    - makezero
+    - misspell
+    - nestif
+    - nilerr
+    - noctx
+    - nolintlint
+    - prealloc
+    - predeclared
+    - reassign
+    - spancheck
+    - staticcheck
+    - tenv
+    - tparallel
+    - typecheck
+    - unconvert
+    - unused
+    - rowserrcheck
+    - sqlclosecheck
+    - unparam
+    - testifylint
+    - usestdlibvars
+    - wastedassign
+    - whitespace

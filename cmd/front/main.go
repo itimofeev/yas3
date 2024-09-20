@@ -27,7 +27,7 @@ func main() {
 
 	slog.Info("front-server is starting")
 	if err := run(cfg); err != nil && !errors.Is(err, context.Canceled) {
-		slog.Error("service is stopped with error: %v", err)
+		slog.Error("service is stopped with error", "err", err)
 	}
 
 	slog.Info("service is stopped")
@@ -63,7 +63,7 @@ func signalContext() context.Context {
 
 	go func() {
 		sig := <-c
-		slog.Info("received signal: %s", sig)
+		slog.Info("received signal", "sig", sig)
 		cancel()
 	}()
 
