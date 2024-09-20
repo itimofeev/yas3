@@ -33,7 +33,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("config validation error: %w", err)
 	}
 
-	if _, err := os.Stat(cfg.BasePath); errors.Is(err, os.ErrNotExist) {
+	if err := os.MkdirAll(cfg.BasePath, os.ModePerm); err != nil {
 		return nil, err
 	}
 
