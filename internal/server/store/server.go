@@ -4,19 +4,21 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"log/slog"
-	"net"
+	"net/http"
+	"net/http/pprof"
 
-	"github.com/quic-go/quic-go"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/quic-go/quic-go/http3"
 )
 
 type Config struct {
-	Port int
+	Addr string
 }
 
 type Server struct {
-	ln *quic.Listener
+	srv *http3.Server
 }
 
 func New(cfg Config) (*Server, error) {
@@ -27,39 +29,81 @@ func New(cfg Config) (*Server, error) {
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
-		NextProtos:   []string{"quic-echo"},
 	}
-	quicConf := &quic.Config{}
 
-	ln, err := quic.ListenAddr(":"+fmt.Sprint(cfg.Port), tlsConfig, quicConf)
-	if err != nil {
-		return nil, err
+	s := &Server{}
+
+	s.srv = &http3.Server{
+		Addr:      cfg.Addr,
+		Handler:   s.initRouter(),
+		TLSConfig: tlsConfig,
 	}
-	slog.Info("listening for incoming connections", "port", cfg.Port)
-
-	return &Server{
-		ln: ln,
-	}, nil
+	return s, nil
 }
 
-func (s Server) Run(ctx context.Context) error {
-	conn, err := s.ln.Accept(ctx)
-	if err != nil {
+func (s *Server) Run(ctx context.Context) error {
+	closedCh := make(chan struct{})
+
+	go func() {
+		<-ctx.Done()
+		slog.Info("web server graceful shutdown is in progress")
+
+		if err := s.srv.Close(); err != nil { // not so gracefully for now ( need to wait when this feature will be implemented in lib
+			slog.Warn("err stopping http server", "err", err)
+		}
+
+		slog.Info("web server gracefully stopped")
+		close(closedCh)
+	}()
+
+	slog.Info("starting http server on", "addr", s.srv.Addr)
+	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
-	slog.Info("new connection accepted", "remote", conn.RemoteAddr().String(), "local", conn.LocalAddr().String())
-
-	for {
-		receiveStream, err := conn.AcceptUniStream(ctx)
-		var netErr net.Error
-		if errors.As(err, &netErr) {
-			slog.Error("error on accepting new stream", "err", netErr.Error())
-		}
-		slog.Info("stream accepted", "streamID", receiveStream.StreamID())
-		_ = receiveStream
-	}
+	<-closedCh
 
 	return nil
+}
+
+func (s *Server) initRouter() http.Handler {
+	r := chi.NewRouter()
+	r.Use(
+		middleware.Recoverer,
+	)
+
+	r.Group(func(router chi.Router) {
+		router.Group(func(telemetry chi.Router) {
+			telemetry.HandleFunc("/pprof", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, r.RequestURI+"/", http.StatusMovedPermanently)
+			})
+			telemetry.HandleFunc("/pprof/*", pprof.Index)
+			telemetry.HandleFunc("/pprof/cmdline", pprof.Cmdline)
+			telemetry.HandleFunc("/pprof/profile", pprof.Profile)
+			telemetry.HandleFunc("/pprof/symbol", pprof.Symbol)
+			telemetry.HandleFunc("/pprof/trace", pprof.Trace)
+
+			telemetry.Handle("/pprof/goroutine", pprof.Handler("goroutine"))
+			telemetry.Handle("/pprof/threadcreate", pprof.Handler("threadcreate"))
+			telemetry.Handle("/pprof/mutex", pprof.Handler("mutex"))
+			telemetry.Handle("/pprof/heap", pprof.Handler("heap"))
+			telemetry.Handle("/pprof/block", pprof.Handler("block"))
+			telemetry.Handle("/pprof/allocs", pprof.Handler("allocs"))
+		})
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RequestID)
+		r.Route("/api/v1", func(api chi.Router) {
+			api.Get("/hello", s.hello)
+		})
+	})
+
+	return r
+
+}
+
+func (s *Server) hello(resp http.ResponseWriter, req *http.Request) {
+	resp.Write([]byte("hello, therre!!!"))
 }
 
 const certPEM = `-----BEGIN CERTIFICATE-----

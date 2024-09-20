@@ -16,7 +16,7 @@ import (
 )
 
 type configuration struct {
-	StoreServerPort int `envconfig:"STORE_SERVER_PORT" default:"9090"`
+	StoreServerAddr string `envconfig:"STORE_SERVER_ADDR" default:":9090"`
 }
 
 func main() {
@@ -34,7 +34,7 @@ func run(cfg configuration) error {
 	ctx := signalContext()
 
 	storeServer, err := store.New(store.Config{
-		Port: cfg.StoreServerPort,
+		Addr: cfg.StoreServerAddr,
 	})
 	if err != nil {
 		return err

@@ -1,50 +1,44 @@
 package store
 
 import (
-	"context"
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"io"
 	"log"
-	"log/slog"
+	"net/http"
 	"testing"
-	"time"
 
-	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 )
 
 func TestClientConnect(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second) // 3s handshake timeout
-	defer cancel()
-
-	quicConfig := &quic.Config{Versions: []quic.Version{quic.Version2}}
-	tlsConfig := &tls.Config{
-		RootCAs:    getRootCA(),
-		NextProtos: []string{"quic-echo"},
+	roundTripper := &http3.RoundTripper{
+		TLSClientConfig: &tls.Config{
+			RootCAs: getRootCA(),
+		},
+	}
+	defer roundTripper.Close()
+	client := &http.Client{
+		Transport: roundTripper,
 	}
 
-	sess, err := quic.DialAddr(ctx, "localhost:9090", tlsConfig, quicConfig)
+	addr := "https://localhost:9090/api/v1/hello"
+	rsp, err := client.Get(addr)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
+	defer rsp.Body.Close()
 
-	// Открытие потока для передачи данных
-	stream, err := sess.OpenUniStream()
+	body := &bytes.Buffer{}
+	_, err = io.Copy(body, rsp.Body)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	// Отправка сообщения на сервер
-	message := "Привет от QUIC-клиента!"
-	_, err = stream.Write([]byte(message))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("Отправлено сообщение: %s", message)
-
-	<-stream.Context().Done()
-	slog.Info("stream closed")
+	log.Printf("Body length: %d bytes \n", body.Len())
+	log.Printf("Response body %s \n", body.Bytes())
 }
 
 func getRootCA() *x509.CertPool {
