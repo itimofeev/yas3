@@ -13,6 +13,7 @@ type Config struct {
 	DBPath string `validate:"required"`
 }
 
+// Registry contains information about uploaded files. For example on which server which file part is stored.
 type Registry struct {
 	db *badger.DB
 }

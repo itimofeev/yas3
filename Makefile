@@ -19,4 +19,4 @@ down:
 	docker compose down
 
 clean-temp:
-	rm temp/store/0/* temp/store/1/* temp/store/2/* temp/store/badger/*
+	rm -r temp/store/*

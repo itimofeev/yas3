@@ -24,6 +24,8 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	// fileSize parameter is used to be able to split files into parts without reading the whole content into memory
+	// current code skips checks that real file size matches number in parameter, but it better to add this check in production implementation.
 	fileSizeStr := req.URL.Query().Get("fileSize")
 	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
 	if err != nil {
@@ -35,6 +37,7 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	// check if file already uploaded with this id
 	if s.fileRegistry.IsFileExists(fileID.String()) {
 		s.error(req, resp, fmt.Errorf("file already exists %s", fileID.String()))
 		return
@@ -42,12 +45,14 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 
 	partSize := fileSize/s.cfg.PartsCount + 1
 
+	// receives link to store servers where we can upload file parts
 	storeServers, err := s.serversRegistry.GetServersForParts(s.cfg.PartsCount)
 	if err != nil {
 		s.error(req, resp, err)
 		return
 	}
 
+	// upload file parts in cycle without any parallelism, because network to our store servers will be much faster than from client to rest server
 	serverIDs := make([]string, 0, len(storeServers))
 	for partNumber, storeForUpload := range storeServers {
 		fileName := fileID.String() + "." + strconv.FormatInt(int64(partNumber), 10)
@@ -61,6 +66,8 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 		serverIDs = append(serverIDs, storeForUpload.GetID())
 	}
 
+	// save information about uploaded file parts to internal db,
+	// current implementation is not very reliable, can discuss how to make it better
 	if err := s.fileRegistry.SaveFileParts(fileID.String(), serverIDs); err != nil {
 		s.error(req, resp, err)
 		return
@@ -81,6 +88,7 @@ func (s *Server) getFileHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// get information about store servers on which file parts are stored
 	storeClients, err := s.serversRegistry.GetStoreClients(serverIDs)
 	if err != nil {
 		s.error(req, resp, err)
@@ -90,6 +98,7 @@ func (s *Server) getFileHandler(resp http.ResponseWriter, req *http.Request) {
 	for partNumber, storeClient := range storeClients {
 		fileName := fileID.String() + "." + strconv.FormatInt(int64(partNumber), 10)
 
+		// copy part content from store server response directly to rest server response
 		err := func(ctx context.Context) error {
 			filePartReader, err := storeClient.GetFile(ctx, fileName)
 			if err != nil {

@@ -20,6 +20,7 @@ type Config struct {
 	StoreAddr string `validate:"required"`
 }
 
+// Client for store server. Can upload, download files and query for server state.
 type Client struct {
 	httpClient http.Client
 	cfg        Config

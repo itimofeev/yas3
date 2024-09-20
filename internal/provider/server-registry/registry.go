@@ -19,6 +19,7 @@ type Config struct {
 	StoreServerAddrs []string `validate:"required"`
 }
 
+// Registry stores information about store servers. Periodically checks store servers available space in order to use the least loaded servers first.
 type Registry struct {
 	storeClients map[string]entity.StoreClient
 
@@ -51,6 +52,7 @@ func New(ctx context.Context, cfg Config) (*Registry, error) {
 	return r, nil
 }
 
+// GetServersForParts returns the least loaded servers to store file parts. Uses server states to decide which servers are more free.
 func (r *Registry) GetServersForParts(nFileParts int64) ([]entity.StoreClient, error) {
 	r.muState.RLock()
 	defer r.muState.RUnlock()
@@ -66,6 +68,7 @@ func (r *Registry) GetServersForParts(nFileParts int64) ([]entity.StoreClient, e
 	return storeClients, nil
 }
 
+// GetStoreClients returns list of clients to store servers that can be used to download files from.
 func (r *Registry) GetStoreClients(serverIDs []string) ([]entity.StoreClient, error) {
 	r.muState.RLock()
 	defer r.muState.RUnlock()
@@ -81,6 +84,7 @@ func (r *Registry) GetStoreClients(serverIDs []string) ([]entity.StoreClient, er
 	return clients, nil
 }
 
+// Run periodically asks store servers about their space statistics.
 func (r *Registry) Run(ctx context.Context) error {
 	t := time.NewTimer(time.Second * 10)
 	for {

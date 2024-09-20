@@ -14,6 +14,7 @@ type Config struct {
 	BasePath string `validate:"required"`
 }
 
+// Client for front rest server, can upload files and download already uploaded files by id
 type Client struct {
 	httpClient http.Client
 	cfg        Config
