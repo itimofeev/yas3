@@ -28,7 +28,8 @@ type Client struct {
 func New(cfg Config) (*Client, error) {
 	roundTripper := &http3.RoundTripper{
 		TLSClientConfig: &tls.Config{
-			RootCAs: getRootCA(),
+			RootCAs:            getRootCA(),
+			InsecureSkipVerify: true,
 		},
 	}
 

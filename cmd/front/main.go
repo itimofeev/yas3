@@ -25,6 +25,7 @@ type configuration struct {
 	FrontWriteTimeout time.Duration `envconfig:"FRONT_WRITE_DURATION" default:"10s"`
 	StoreServerAddrs  []string      `envconfig:"FRONT_STORE_CLIENT_ADDR" default:"https://localhost:9090"`
 	FilesDBPath       string        `envconfig:"FRONT_FILES_DB_PATH" default:"temp/store/badger"`
+	FilePartsCount    int64         `envconfig:"FRONT_FILE_PARTS_COUNT" default:"2"`
 }
 
 func main() {
@@ -59,7 +60,7 @@ func run(cfg configuration) error {
 		ReadTimeout:      cfg.FrontReadTimeout,
 		WriteTimeout:     cfg.FrontWriteTimeout,
 		MaxFileSizeBytes: 1024 * 1024,
-		PartsCount:       2,
+		PartsCount:       cfg.FilePartsCount,
 		ServersRegistry:  storeServersRegistry,
 		FileRegistry:     fileRegistry,
 	})

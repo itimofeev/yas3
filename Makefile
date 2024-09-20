@@ -12,3 +12,9 @@ build-image:
 	docker build -f Dockerfile . \
 		  --platform linux/amd64 \
           --tag yas3-front:local
+
+up:
+	docker compose up -d
+
+clean-temp:
+	rm temp/store/0/* temp/store/1/* temp/store/2/* temp/store/badger/*

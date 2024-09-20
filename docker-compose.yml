@@ -1,0 +1,48 @@
+services:
+  front:
+    image: yas3-front:local
+    environment:
+      FRONT_ADDR: :8080
+      FRONT_STORE_CLIENT_ADDR: https://store0:9090,https://store1:9090,https://store2:9090
+      FRONT_FILES_DB_PATH: /var/lib/badger.db
+      FRONT_FILE_PARTS_COUNT: 2
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./temp/store/badger:/var/lib/badger.db
+    command:
+      - /front
+
+  store0:
+    image: yas3-front:local
+    environment:
+      STORE_SERVER_ADDR: :9090
+      STORE_BASE_PATH: temp/store
+    volumes:
+      - ./temp/store/0:/temp/store
+    command:
+      - /store
+
+  store1:
+    image: yas3-front:local
+    environment:
+      STORE_SERVER_ADDR: :9090
+      STORE_BASE_PATH: temp/store
+    volumes:
+      - ./temp/store/1:/temp/store
+    command:
+      - /store
+
+  store2:
+    image: yas3-front:local
+    environment:
+      STORE_SERVER_ADDR: :9090
+      STORE_BASE_PATH: temp/store
+    volumes:
+      - ./temp/store/2:/temp/store
+    command:
+      - /store
+
+volumes:
+  files-db:
+  store-0:

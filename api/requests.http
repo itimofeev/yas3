@@ -1,9 +1,9 @@
 ### upload file by id
-POST http://localhost:8080/api/v1/uploadFile/88ba5240-342e-4f12-b53c-0c35687b8e50?fileSize=16
+POST http://localhost:8080/api/v1/uploadFile/88ba5240-342e-4f12-b53c-0c35687b8e51?fileSize=16
 Accept: application/json
 
 < ./example-file.txt
 
 ### get file by id
-GET http://localhost:8080/api/v1/getFile/566ff7f0-96ee-4bb9-8451-5ba9306cae2a
+GET http://localhost:8080/api/v1/getFile/88ba5240-342e-4f12-b53c-0c35687b8e51
 Accept: application/json

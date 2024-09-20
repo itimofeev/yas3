@@ -20,6 +20,7 @@ type storeServersRegistry interface {
 type fileRegistry interface {
 	SaveFileParts(fileID string, serverIDs []string) error
 	GetFileParts(fileID string) ([]string, error)
+	IsFileExists(fileID string) bool
 }
 
 type Config struct {

@@ -35,6 +35,11 @@ func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	if s.fileRegistry.IsFileExists(fileID.String()) {
+		s.error(req, resp, fmt.Errorf("file already exists %s", fileID.String()))
+		return
+	}
+
 	partSize := fileSize/s.cfg.PartsCount + 1
 
 	storeServers, err := s.serversRegistry.GetServersForParts(s.cfg.PartsCount)

@@ -58,6 +58,19 @@ func (r *Registry) GetFileParts(fileID string) ([]string, error) {
 	return serverIDs, err
 }
 
+func (r *Registry) IsFileExists(fileID string) bool {
+	err := r.db.View(func(txn *badger.Txn) error {
+		_, err := txn.Get([]byte(fileID))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err != nil
+}
+
 func (r *Registry) Close() error {
 	return r.db.Close()
 }
