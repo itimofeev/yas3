@@ -23,3 +23,7 @@
 1. Тестируемый код, речь про unit тесты, при этом сами тесты писать не нужно. В первую очередь будет учитываться подход к решению задачи, однако и на качество кода мы тоже смотрим. 
 2. Этим тестовым заданием мы хотим понять образ вашего мышления и умение найти подход к решению задач.
 
+# Considerations
+1. REST-service has to have 2 endpoints: uploadFile(fileID, fileContent) and getFile(fileID).
+2. In order to not read the whole file to memory, let's add one more parameter to uploadFile endpoint - fileSize.
+3. 
