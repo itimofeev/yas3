@@ -14,6 +14,9 @@ issues:
     - G107 # Potential HTTP request made with variable url
     - G404 # Weak random number generator
     - SA9003 # Empty branch
+    - "Error return value of `resp.Body.Close` is not checked"
+    - "Error return value of `file.Close` is not checked"
+    - "Error return value of `filePartReader.Close` is not checked"
 
   exclude-rules:
     - path: _test\.go

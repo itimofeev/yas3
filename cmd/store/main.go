@@ -16,7 +16,9 @@ import (
 )
 
 type configuration struct {
-	StoreServerAddr string `envconfig:"STORE_SERVER_ADDR" default:":9090"`
+	StoreServerAddr     string `envconfig:"STORE_SERVER_ADDR" default:":9090"`
+	StoreBasePath       string `envconfig:"STORE_BASE_PATH" default:"temp/store/1"`
+	StoreTotalSizeBytes int    `envconfig:"STORE_TOTAL_SIZE_BYTES" default:"1000000000"`
 }
 
 func main() {
@@ -34,7 +36,9 @@ func run(cfg configuration) error {
 	ctx := signalContext()
 
 	storeServer, err := store.New(store.Config{
-		Addr: cfg.StoreServerAddr,
+		Addr:                   cfg.StoreServerAddr,
+		BasePath:               cfg.StoreBasePath,
+		MaxAvailableSpaceBytes: cfg.StoreTotalSizeBytes,
 	})
 	if err != nil {
 		return err

@@ -1,4 +1,4 @@
-package front
+package store
 
 import (
 	"context"
@@ -9,76 +9,70 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
-	"strconv"
+	"os"
+	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
 )
 
-func (s *Server) uploadFileHandler(resp http.ResponseWriter, req *http.Request) {
-	fileIDStr := chi.URLParam(req, "fileID")
-	fileID, err := uuid.Parse(fileIDStr)
+func (s *Server) uploadFile(resp http.ResponseWriter, req *http.Request) {
+	fileName := chi.URLParam(req, "fileName")
+	file, err := os.OpenFile(s.cfg.BasePath+"/"+fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		s.error(req, resp, err)
 		return
 	}
+	defer file.Close()
 
-	fileSizeStr := req.URL.Query().Get("fileSize")
-	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
+	_, err = io.Copy(file, req.Body)
 	if err != nil {
 		s.error(req, resp, err)
 		return
 	}
-	if fileSize > s.cfg.MaxFileSizeBytes {
-		s.error(req, resp, fmt.Errorf("too big file size, max size %d", s.cfg.MaxFileSizeBytes))
+	if err := file.Sync(); err != nil {
+		s.error(req, resp, err)
 		return
 	}
 
-	partSize := fileSize/s.cfg.PartsCount + 1
+	_, _ = resp.Write([]byte("ok"))
+}
 
-	for partNumber := range s.cfg.PartsCount {
-		fileName := fileID.String() + "." + strconv.FormatInt(partNumber, 10)
-		partReader := io.LimitReader(req.Body, partSize)
-		err := s.storeClient.UploadFile(req.Context(), fileName, partReader)
+func (s *Server) getFile(resp http.ResponseWriter, req *http.Request) {
+	fileName := chi.URLParam(req, "fileName")
+	file, err := os.OpenFile(s.cfg.BasePath+"/"+fileName, os.O_RDONLY, 0o600)
+	if err != nil {
+		s.error(req, resp, err)
+		return
+	}
+	defer file.Close()
 
-		if err != nil {
-			s.error(req, resp, err)
-			return
-		}
+	_, err = io.Copy(resp, file)
+	if err != nil {
+		slog.Warn("error while sending file", "err", err)
 	}
 }
 
-func (s *Server) getFileHandler(resp http.ResponseWriter, req *http.Request) {
-	fileIDStr := chi.URLParam(req, "fileID")
-	fileID, err := uuid.Parse(fileIDStr)
-	if err != nil {
-		s.error(req, resp, err)
-		return
-	}
-
-	for partNumber := range s.cfg.PartsCount {
-		fileName := fileID.String() + "." + strconv.FormatInt(partNumber, 10)
-
-		err := func(ctx context.Context) error {
-			filePartReader, err := s.storeClient.GetFile(ctx, fileName)
-			if err != nil {
-				return err
-			}
-			defer filePartReader.Close()
-
-			_, err = io.Copy(resp, filePartReader)
+func (s *Server) getAvailableSpace(resp http.ResponseWriter, req *http.Request) {
+	var size int64
+	err := filepath.Walk(s.cfg.BasePath, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
 			return err
-		}(req.Context())
-
-		if err != nil {
-			s.error(req, resp, err)
-			return
 		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+
+	if err != nil {
+		slog.Warn("error while sending file", "err", err)
 	}
+
+	_, _ = resp.Write([]byte(fmt.Sprintf(`{"total": %d, "used": %d}`, s.cfg.MaxAvailableSpaceBytes, size)))
 }
 
-func (s *Server) initServerHandler() *chi.Mux {
+func (s *Server) initRouter() http.Handler {
 	r := chi.NewRouter()
 	r.Use(
 		middleware.Recoverer,
@@ -108,8 +102,9 @@ func (s *Server) initServerHandler() *chi.Mux {
 		r.Use(middleware.RequestID)
 		r.Use(middleware.Logger)
 		r.Route("/api/v1", func(api chi.Router) {
-			api.Post("/uploadFile/{fileID}", s.uploadFileHandler)
-			api.Get("/getFile/{fileID}", s.getFileHandler)
+			api.Post("/uploadFile/{fileName}", s.uploadFile)
+			api.Get("/getFile/{fileName}", s.getFile)
+			api.Get("/getAvailableSpace", s.getAvailableSpace)
 		})
 	})
 
@@ -118,7 +113,6 @@ func (s *Server) initServerHandler() *chi.Mux {
 
 func (s *Server) error(_ *http.Request, w http.ResponseWriter, err error) {
 	slog.Warn("got error while handling request", "err", err)
-
 	switch {
 	case errors.Is(err, context.Canceled):
 		writeErrResponse(w, "timeout", http.StatusRequestTimeout)

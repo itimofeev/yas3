@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/itimofeev/yas3/internal/provider/store"
 	"github.com/itimofeev/yas3/internal/server/front"
 )
 
@@ -20,6 +21,7 @@ type configuration struct {
 	FrontAddr         string        `envconfig:"FRONT_ADDR" default:":8080"`
 	FrontReadTimeout  time.Duration `envconfig:"FRONT_READ_DURATION" default:"10s"`
 	FrontWriteTimeout time.Duration `envconfig:"FRONT_WRITE_DURATION" default:"10s"`
+	StoreAddr         string        `envconfig:"FRONT_STORE_CLIENT_ADDR" default:"https://localhost:9090"`
 }
 
 func main() {
@@ -36,10 +38,18 @@ func main() {
 func run(cfg configuration) error {
 	ctx := signalContext()
 
+	storeClient, err := store.New(store.Config{StoreAddr: cfg.StoreAddr})
+	if err != nil {
+		return err
+	}
+
 	frontServer, err := front.New(front.Config{
-		Addr:         cfg.FrontAddr,
-		ReadTimeout:  cfg.FrontReadTimeout,
-		WriteTimeout: cfg.FrontWriteTimeout,
+		Addr:             cfg.FrontAddr,
+		ReadTimeout:      cfg.FrontReadTimeout,
+		WriteTimeout:     cfg.FrontWriteTimeout,
+		MaxFileSizeBytes: 1024 * 1024,
+		PartsCount:       2,
+		StoreClient:      storeClient,
 	})
 	if err != nil {
 		return err

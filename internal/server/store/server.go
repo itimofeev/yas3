@@ -4,24 +4,34 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
-	"net/http/pprof"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-playground/validator/v10"
+
 	"github.com/quic-go/quic-go/http3"
 )
 
 type Config struct {
-	Addr string
+	// Addr for example :9090
+	Addr string `validate:"required"`
+	// BasePath directory for storing files
+	BasePath               string `validate:"required"`
+	MaxAvailableSpaceBytes int    `validate:"required"`
 }
 
 type Server struct {
 	srv *http3.Server
+	cfg Config
 }
 
 func New(cfg Config) (*Server, error) {
+	err := validator.New().Struct(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("config validation error: %w", err)
+	}
+
 	cert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
 	if err != nil {
 		return nil, err
@@ -31,7 +41,9 @@ func New(cfg Config) (*Server, error) {
 		Certificates: []tls.Certificate{cert},
 	}
 
-	s := &Server{}
+	s := &Server{
+		cfg: cfg,
+	}
 
 	s.srv = &http3.Server{
 		Addr:      cfg.Addr,
@@ -63,47 +75,6 @@ func (s *Server) Run(ctx context.Context) error {
 	<-closedCh
 
 	return nil
-}
-
-func (s *Server) initRouter() http.Handler {
-	r := chi.NewRouter()
-	r.Use(
-		middleware.Recoverer,
-	)
-
-	r.Group(func(router chi.Router) {
-		router.Group(func(telemetry chi.Router) {
-			telemetry.HandleFunc("/pprof", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, r.RequestURI+"/", http.StatusMovedPermanently)
-			})
-			telemetry.HandleFunc("/pprof/*", pprof.Index)
-			telemetry.HandleFunc("/pprof/cmdline", pprof.Cmdline)
-			telemetry.HandleFunc("/pprof/profile", pprof.Profile)
-			telemetry.HandleFunc("/pprof/symbol", pprof.Symbol)
-			telemetry.HandleFunc("/pprof/trace", pprof.Trace)
-
-			telemetry.Handle("/pprof/goroutine", pprof.Handler("goroutine"))
-			telemetry.Handle("/pprof/threadcreate", pprof.Handler("threadcreate"))
-			telemetry.Handle("/pprof/mutex", pprof.Handler("mutex"))
-			telemetry.Handle("/pprof/heap", pprof.Handler("heap"))
-			telemetry.Handle("/pprof/block", pprof.Handler("block"))
-			telemetry.Handle("/pprof/allocs", pprof.Handler("allocs"))
-		})
-	})
-
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.RequestID)
-		r.Route("/api/v1", func(api chi.Router) {
-			api.Get("/hello", s.hello)
-		})
-	})
-
-	return r
-
-}
-
-func (s *Server) hello(resp http.ResponseWriter, req *http.Request) {
-	resp.Write([]byte("hello, therre!!!"))
 }
 
 const certPEM = `-----BEGIN CERTIFICATE-----

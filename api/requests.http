@@ -1,3 +1,5 @@
 ### upload file by id
-POST http://localhost:8080/api/v1/uploadFile/123?fileSize=777
+POST http://localhost:8080/api/v1/uploadFile/88ba5240-342e-4f12-b53c-0c35687b8e50?fileSize=16
 Accept: application/json
+
+< ./example-file.txt

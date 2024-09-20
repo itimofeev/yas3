@@ -3,27 +3,48 @@ package front
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
-	"net/http/pprof"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-playground/validator/v10"
+
+	"github.com/itimofeev/yas3/internal/entity"
 )
 
+type storeClient interface {
+	UploadFile(ctx context.Context, fileName string, content io.Reader) error
+	GetFile(ctx context.Context, fileName string) (io.ReadCloser, error)
+	GetAvailableSpace(ctx context.Context) (entity.AvailableSpace, error)
+}
+
 type Config struct {
-	Addr         string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
+	Addr             string        `validate:"required"`
+	ReadTimeout      time.Duration `validate:"required"`
+	WriteTimeout     time.Duration `validate:"required"`
+	MaxFileSizeBytes int64         `validate:"required,gt=0"`
+	PartsCount       int64         `validate:"required,gt=0"`
+	StoreClient      storeClient   `validate:"required"`
 }
 
 type Server struct {
-	srv *http.Server
+	srv         *http.Server
+	cfg         Config
+	storeClient storeClient
 }
 
 func New(cfg Config) (*Server, error) {
-	frontServer := &Server{}
+	err := validator.New().Struct(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("config validation error: %w", err)
+	}
+
+	frontServer := &Server{
+		cfg:         cfg,
+		storeClient: cfg.StoreClient,
+	}
 
 	handler := frontServer.initServerHandler()
 	frontServer.srv = &http.Server{
@@ -36,44 +57,7 @@ func New(cfg Config) (*Server, error) {
 	return frontServer, nil
 }
 
-func (sf *Server) initServerHandler() *chi.Mux {
-	r := chi.NewRouter()
-	r.Use(
-		middleware.Recoverer,
-	)
-
-	r.Group(func(router chi.Router) {
-		router.Group(func(telemetry chi.Router) {
-			telemetry.HandleFunc("/pprof", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, r.RequestURI+"/", http.StatusMovedPermanently)
-			})
-			telemetry.HandleFunc("/pprof/*", pprof.Index)
-			telemetry.HandleFunc("/pprof/cmdline", pprof.Cmdline)
-			telemetry.HandleFunc("/pprof/profile", pprof.Profile)
-			telemetry.HandleFunc("/pprof/symbol", pprof.Symbol)
-			telemetry.HandleFunc("/pprof/trace", pprof.Trace)
-
-			telemetry.Handle("/pprof/goroutine", pprof.Handler("goroutine"))
-			telemetry.Handle("/pprof/threadcreate", pprof.Handler("threadcreate"))
-			telemetry.Handle("/pprof/mutex", pprof.Handler("mutex"))
-			telemetry.Handle("/pprof/heap", pprof.Handler("heap"))
-			telemetry.Handle("/pprof/block", pprof.Handler("block"))
-			telemetry.Handle("/pprof/allocs", pprof.Handler("allocs"))
-		})
-	})
-
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.RequestID)
-		r.Route("/api/v1", func(api chi.Router) {
-			api.Post("/uploadFile/{fileID}", sf.uploadFileHandler)
-			api.Post("/getFile/{fileID}", sf.getFileHandler)
-		})
-	})
-
-	return r
-}
-
-func (sf *Server) Run(ctx context.Context) error {
+func (s *Server) Run(ctx context.Context) error {
 	closedCh := make(chan struct{})
 
 	go func() {
@@ -84,7 +68,7 @@ func (sf *Server) Run(ctx context.Context) error {
 		defer cancel()
 
 		//nolint:contextcheck // intentionally used another context as main one is most probably already canceled
-		if err := sf.srv.Shutdown(withTimeout); err != nil {
+		if err := s.srv.Shutdown(withTimeout); err != nil {
 			slog.Warn("err stopping http server", "err", err)
 		}
 
@@ -92,8 +76,8 @@ func (sf *Server) Run(ctx context.Context) error {
 		close(closedCh)
 	}()
 
-	slog.Info("starting http server on", "addr", sf.srv.Addr)
-	if err := sf.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	slog.Info("starting http server on", "addr", s.srv.Addr)
+	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 
